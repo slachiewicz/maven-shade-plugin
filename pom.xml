@@ -65,7 +65,7 @@
   </distributionManagement>
 
   <properties>
-    <mavenVersion>3.0</mavenVersion>
+    <mavenVersion>3.6.3</mavenVersion>
     <javaVersion>7</javaVersion>
     <currentVersion>${project.version}</currentVersion>
     <asmVersion>8.0.1</asmVersion>
@@ -312,7 +312,7 @@
                   <source>src/it/mrm/repository</source>
                   <cloneTo>target/mock-repo</cloneTo> <!-- due to on the fly created jars -->
                 </mockRepo>
-                <proxyRepo />
+                <proxyRepo/>
               </repositories>
             </configuration>
           </plugin>
