@@ -191,7 +191,7 @@
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
-      <version>3.8.1</version>
+      <version>3.11</version>
     </dependency>
 
     <dependency>
@@ -312,7 +312,7 @@
                   <source>src/it/mrm/repository</source>
                   <cloneTo>target/mock-repo</cloneTo> <!-- due to on the fly created jars -->
                 </mockRepo>
-                <proxyRepo />
+                <proxyRepo/>
               </repositories>
             </configuration>
           </plugin>
