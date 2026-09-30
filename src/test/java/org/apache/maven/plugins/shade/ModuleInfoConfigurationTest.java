@@ -35,7 +35,7 @@ import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
 import java.util.jar.Manifest;
 
-import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.api.plugin.MojoException;
 import org.apache.maven.plugins.shade.filter.Filter;
 import org.apache.maven.plugins.shade.relocation.SimpleRelocator;
 import org.junit.jupiter.api.Assumptions;
@@ -99,7 +99,7 @@ public class ModuleInfoConfigurationTest {
             ShadeRequest request = moduleRequest(primary, newFile("invalid-" + index++ + ".jar"));
             request.setModuleInfoConfiguration(configuration);
 
-            MojoExecutionException exception = assertThrows(MojoExecutionException.class, () -> shade(request));
+            MojoException exception = assertThrows(MojoException.class, () -> shade(request));
             assertTrue(exception.getMessage().contains("Invalid moduleInfo.moduleName '" + invalid + "'"));
         }
     }

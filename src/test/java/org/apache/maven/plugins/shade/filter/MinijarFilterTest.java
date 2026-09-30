@@ -20,32 +20,20 @@ package org.apache.maven.plugins.shade.filter;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.jar.JarOutputStream;
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
-import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.DefaultArtifact;
-import org.apache.maven.artifact.DependencyResolutionRequiredException;
-import org.apache.maven.model.Build;
-import org.apache.maven.plugin.logging.Log;
-import org.apache.maven.project.MavenProject;
+import org.apache.maven.api.plugin.Log;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 public class MinijarFilterTest {
 
@@ -54,7 +42,6 @@ public class MinijarFilterTest {
 
     private File outputDirectory;
     private File emptyFile;
-    private File jarFile;
     private Log log;
     private ArgumentCaptor<CharSequence> logCaptor;
 
@@ -62,22 +49,17 @@ public class MinijarFilterTest {
     public void init() throws IOException {
         this.outputDirectory = newFolder(tempFolder, "junit");
         this.emptyFile = File.createTempFile("junit", null, tempFolder);
-        this.jarFile = File.createTempFile("junit", null, tempFolder);
-        new JarOutputStream(Files.newOutputStream(this.jarFile.toPath())).close();
         this.log = mock(Log.class);
         logCaptor = ArgumentCaptor.forClass(CharSequence.class);
     }
 
-    /**
-     * This test will fail on JDK 7 because jdependency needs at least JDK 8.
-     */
     @Test
     public void testWithMockProject() throws IOException {
-        assumeFalse(System.getProperty("java.version").startsWith("1.7"), "Expected to run under JDK8+");
+        Map<String, Path> dependencies = new LinkedHashMap<>();
+        dependencies.put("dep.com:dep.aid:jar:classifier2:1.0:compile", emptyFile.toPath());
 
-        MavenProject mavenProject = mockProject(outputDirectory, emptyFile);
-
-        MinijarFilter mf = new MinijarFilter(mavenProject, log);
+        MinijarFilter mf =
+                new MinijarFilter("com:aid:jar:1.9", emptyFile.toPath(), outputDirectory.toPath(), dependencies, log);
 
         mf.finished();
 
@@ -89,61 +71,19 @@ public class MinijarFilterTest {
     @Test
     public void testWithPomProject() throws IOException {
         // project with pom packaging and no artifact.
-        MavenProject mavenProject = mockProject(outputDirectory, null);
-        mavenProject.setPackaging("pom");
+        @SuppressWarnings("unchecked")
+        Map<String, Path> dependencies = mock(Map.class);
 
-        MinijarFilter mf = new MinijarFilter(mavenProject, log);
+        MinijarFilter mf = new MinijarFilter("com:aid:pom:1.9", null, outputDirectory.toPath(), dependencies, log);
 
         mf.finished();
 
         verify(log).info(logCaptor.capture());
 
-        // verify no access to project's artifacts
-        verify(mavenProject, never()).getArtifacts();
+        // verify no access to project's dependencies
+        verifyNoInteractions(dependencies);
 
         assertEquals("Minimized 0 -> 0", logCaptor.getValue());
-    }
-
-    private MavenProject mockProject(File outputDirectory, File file, String... classPathElements) {
-        MavenProject mavenProject = mock(MavenProject.class);
-
-        Artifact artifact = mock(Artifact.class);
-        when(artifact.getGroupId()).thenReturn("com");
-        when(artifact.getArtifactId()).thenReturn("aid");
-        when(artifact.getVersion()).thenReturn("1.9");
-        when(artifact.getClassifier()).thenReturn("classifier1");
-        when(artifact.getScope()).thenReturn(Artifact.SCOPE_COMPILE);
-
-        when(mavenProject.getArtifact()).thenReturn(artifact);
-
-        DefaultArtifact dependencyArtifact =
-                new DefaultArtifact("dep.com", "dep.aid", "1.0", "compile", "jar", "classifier2", null);
-        dependencyArtifact.setFile(file);
-
-        Set<Artifact> artifacts = new TreeSet<>();
-        artifacts.add(dependencyArtifact);
-
-        when(mavenProject.getArtifacts()).thenReturn(artifacts);
-
-        when(mavenProject.getArtifact().getFile()).thenReturn(file);
-
-        Build build = new Build();
-        build.setOutputDirectory(outputDirectory.toString());
-
-        List<String> classpath = new ArrayList<>();
-        classpath.add(outputDirectory.toString());
-        if (file != null) {
-            classpath.add(file.toString());
-        }
-        classpath.addAll(Arrays.asList(classPathElements));
-        when(mavenProject.getBuild()).thenReturn(build);
-        try {
-            when(mavenProject.getRuntimeClasspathElements()).thenReturn(classpath);
-        } catch (DependencyResolutionRequiredException e) {
-            fail("Encountered unexpected exception: " + e.getClass().getSimpleName() + ": " + e.getMessage());
-        }
-
-        return mavenProject;
     }
 
     @Test

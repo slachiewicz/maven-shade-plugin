@@ -27,7 +27,7 @@ import java.util.TreeSet;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
-import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.api.plugin.MojoException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.objectweb.asm.ClassWriter;
@@ -97,8 +97,7 @@ public class PlatformModuleIndexTest {
         assertTrue(jmods.mkdirs());
         writeJmod(new File(jmods, "java.base.jmod"), "java.base", Opcodes.V21, "java/lang/Object");
 
-        MojoExecutionException exception =
-                assertThrows(MojoExecutionException.class, () -> new PlatformModuleIndex(jdkHome));
+        MojoException exception = assertThrows(MojoException.class, () -> new PlatformModuleIndex(jdkHome));
 
         assertTrue(exception.getMessage().contains("missing lib/ct.sym"));
         assertTrue(exception.getMessage().contains(jdkHome.getAbsolutePath()));

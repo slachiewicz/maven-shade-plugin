@@ -32,7 +32,7 @@ import java.util.TreeSet;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
-import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.api.plugin.MojoException;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ModuleVisitor;
@@ -58,7 +58,7 @@ final class PlatformModuleIndex {
 
     private final int release;
 
-    PlatformModuleIndex(File jdkHome) throws MojoExecutionException {
+    PlatformModuleIndex(File jdkHome) throws MojoException {
         this.jdkHome = normalizeJdkHome(jdkHome);
         this.release = readCurrentRelease();
         readCurrentReleaseClasses();
@@ -83,7 +83,7 @@ final class PlatformModuleIndex {
                 .contains(module);
     }
 
-    private int readCurrentRelease() throws MojoExecutionException {
+    private int readCurrentRelease() throws MojoException {
         File javaBase = new File(new File(jdkHome, "jmods"), "java.base.jmod");
         if (!javaBase.isFile()) {
             throw invalidJdk("missing jmods/java.base.jmod");
@@ -97,11 +97,11 @@ final class PlatformModuleIndex {
                 return classRelease(new ClassReader(input).readShort(6));
             }
         } catch (IOException | IllegalArgumentException e) {
-            throw new MojoExecutionException("Cannot read the module-info analysis JDK at " + jdkHome, e);
+            throw new MojoException("Cannot read the module-info analysis JDK at " + jdkHome, e);
         }
     }
 
-    private void readHistoricalReleases() throws MojoExecutionException {
+    private void readHistoricalReleases() throws MojoException {
         File ctSym = new File(new File(jdkHome, "lib"), "ct.sym");
         if (!ctSym.isFile()) {
             if (release > FIRST_MODULE_RELEASE) {
@@ -122,7 +122,7 @@ final class PlatformModuleIndex {
                 }
             }
         } catch (IOException e) {
-            throw new MojoExecutionException("Cannot read " + ctSym + " for module-info analysis", e);
+            throw new MojoException("Cannot read " + ctSym + " for module-info analysis", e);
         }
     }
 
@@ -251,7 +251,7 @@ final class PlatformModuleIndex {
         }
     }
 
-    private void readCurrentReleaseClasses() throws MojoExecutionException {
+    private void readCurrentReleaseClasses() throws MojoException {
         File jmods = new File(jdkHome, "jmods");
         File[] files = jmods.listFiles((directory, name) -> name.endsWith(".jmod"));
         if (files == null || files.length == 0) {
@@ -276,7 +276,7 @@ final class PlatformModuleIndex {
                     }
                 }
             } catch (IOException e) {
-                throw new MojoExecutionException("Cannot read " + file + " for module-info analysis", e);
+                throw new MojoException("Cannot read " + file + " for module-info analysis", e);
             }
         }
     }
@@ -298,8 +298,8 @@ final class PlatformModuleIndex {
         modules.computeIfAbsent(targetRelease, key -> new TreeSet<>()).add(module);
     }
 
-    private MojoExecutionException invalidJdk(String reason) {
-        return new MojoExecutionException("Invalid module-info analysis JDK at " + jdkHome + ": " + reason
+    private MojoException invalidJdk(String reason) {
+        return new MojoException("Invalid module-info analysis JDK at " + jdkHome + ": " + reason
                 + ". Configure moduleInfo.analysisJdkToolchain with a complete modular JDK.");
     }
 

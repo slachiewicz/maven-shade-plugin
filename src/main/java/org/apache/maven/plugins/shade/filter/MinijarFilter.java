@@ -20,24 +20,23 @@ package org.apache.maven.plugins.shade.filter;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.zip.ZipException;
 
-import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.DependencyResolutionRequiredException;
-import org.apache.maven.plugin.logging.Log;
-import org.apache.maven.project.MavenProject;
+import org.apache.maven.api.plugin.Log;
 import org.vafer.jdependency.Clazz;
 import org.vafer.jdependency.Clazzpath;
 import org.vafer.jdependency.ClazzpathUnit;
@@ -67,51 +66,89 @@ public class MinijarFilter implements Filter {
     }
 
     /**
-     * @param project {@link MavenProject}
+     * @param projectId name of the project, used in messages
+     * @param projectArtifact the project's own artifact, may be {@code null} when it was not built
+     * @param outputDirectory the project's output directory
+     * @param dependencies the runtime dependencies, keyed by a label for messages, in classpath order
      * @param log {@link Log}
      * @throws IOException in case of error
      */
-    public MinijarFilter(MavenProject project, Log log) throws IOException {
-        this(project, log, Collections.<SimpleFilter>emptyList(), Collections.<String>emptySet());
+    public MinijarFilter(
+            String projectId, Path projectArtifact, Path outputDirectory, Map<String, Path> dependencies, Log log)
+            throws IOException {
+        this(
+                projectId,
+                projectArtifact,
+                outputDirectory,
+                dependencies,
+                log,
+                Collections.<SimpleFilter>emptyList(),
+                Collections.<String>emptySet());
     }
 
     /**
-     * @param project {@link MavenProject}
+     * @param projectId name of the project, used in messages
+     * @param projectArtifact the project's own artifact, may be {@code null} when it was not built
+     * @param outputDirectory the project's output directory
+     * @param dependencies the runtime dependencies, keyed by a label for messages, in classpath order
      * @param log {@link Log}
      * @param entryPoints
      * @throws IOException in case of error
      */
-    public MinijarFilter(MavenProject project, Log log, Set<String> entryPoints) throws IOException {
-        this(project, log, Collections.<SimpleFilter>emptyList(), entryPoints);
+    public MinijarFilter(
+            String projectId,
+            Path projectArtifact,
+            Path outputDirectory,
+            Map<String, Path> dependencies,
+            Log log,
+            Set<String> entryPoints)
+            throws IOException {
+        this(
+                projectId,
+                projectArtifact,
+                outputDirectory,
+                dependencies,
+                log,
+                Collections.<SimpleFilter>emptyList(),
+                entryPoints);
     }
 
     /**
-     * @param project {@link MavenProject}
+     * @param projectId name of the project, used in messages
+     * @param projectArtifact the project's own artifact, may be {@code null} when it was not built
+     * @param outputDirectory the project's output directory
+     * @param dependencies the runtime dependencies, keyed by a label for messages, in classpath order
      * @param log {@link Log}
      * @param simpleFilters {@link SimpleFilter}
      * @param entryPoints
      * @throws IOException in case of errors
      * @since 1.6
      */
-    public MinijarFilter(MavenProject project, Log log, List<SimpleFilter> simpleFilters, Set<String> entryPoints)
+    public MinijarFilter(
+            String projectId,
+            Path projectArtifact,
+            Path outputDirectory,
+            Map<String, Path> dependencies,
+            Log log,
+            List<SimpleFilter> simpleFilters,
+            Set<String> entryPoints)
             throws IOException {
         this.log = log;
 
-        File artifactFile = project.getArtifact().getFile();
+        Path artifactFile = projectArtifact;
 
         if (artifactFile != null) {
             Clazzpath cp = new Clazzpath();
 
-            ClazzpathUnit artifactUnit =
-                    cp.addClazzpathUnit(Files.newInputStream(artifactFile.toPath()), project.toString());
+            ClazzpathUnit artifactUnit = cp.addClazzpathUnit(Files.newInputStream(artifactFile), projectId);
 
-            for (Artifact dependency : project.getArtifacts()) {
-                addDependencyToClasspath(cp, dependency);
+            for (Map.Entry<String, Path> dependency : dependencies.entrySet()) {
+                addDependencyToClasspath(cp, dependency.getKey(), dependency.getValue());
             }
 
             removable = cp.getClazzes();
             if (removable.remove(new Clazz("module-info"))) {
-                log.warn("Removing module-info from " + artifactFile.getName());
+                log.warn("Removing module-info from " + artifactFile.getFileName());
             }
             removePackages(artifactUnit);
             if (entryPoints.isEmpty()) {
@@ -142,33 +179,37 @@ public class MinijarFilter implements Filter {
                 }
             }
             removeSpecificallyIncludedClasses(
-                    project, simpleFilters == null ? Collections.<SimpleFilter>emptyList() : simpleFilters);
-            removeServices(project, cp);
+                    dependencies, simpleFilters == null ? Collections.<SimpleFilter>emptyList() : simpleFilters);
+
+            // the runtime classpath is the build output directory and all the dependencies' jars
+            List<Path> runtimeClasspath = new ArrayList<>();
+            if (outputDirectory != null) {
+                runtimeClasspath.add(outputDirectory);
+            }
+            runtimeClasspath.addAll(dependencies.values());
+            removeServices(runtimeClasspath, cp);
         }
     }
 
-    private void removeServices(final MavenProject project, final Clazzpath cp) {
+    private void removeServices(final List<Path> runtimeClasspath, final Clazzpath cp) {
         boolean repeatScan;
         do {
             repeatScan = false;
             final Set<Clazz> neededClasses = cp.getClazzes();
             neededClasses.removeAll(removable);
-            try {
-                // getRuntimeClasspathElements returns a list of
-                //  - the build output directory
-                //  - all the paths to the dependencies' jars
-                // We thereby need to ignore the build directory because we don't want
-                // to remove anything from it, as it's the starting point of the
-                // minification process.
-                for (final String fileName : project.getRuntimeClasspathElements()) {
-                    if (new File(fileName).isDirectory()) {
-                        repeatScan |= removeServicesFromDir(cp, neededClasses, fileName);
-                    } else {
-                        repeatScan |= removeServicesFromJar(cp, neededClasses, fileName);
-                    }
+            // The runtime classpath is
+            //  - the build output directory
+            //  - all the paths to the dependencies' jars
+            // We thereby need to ignore the build directory because we don't want
+            // to remove anything from it, as it's the starting point of the
+            // minification process.
+            for (final Path element : runtimeClasspath) {
+                final String fileName = element.toString();
+                if (Files.isDirectory(element)) {
+                    repeatScan |= removeServicesFromDir(cp, neededClasses, fileName);
+                } else {
+                    repeatScan |= removeServicesFromJar(cp, neededClasses, fileName);
                 }
-            } catch (final DependencyResolutionRequiredException e) {
-                log.warn(e.getMessage());
             }
         } while (repeatScan);
     }
@@ -255,15 +296,14 @@ public class MinijarFilter implements Filter {
         removable.removeAll(clazz.getTransitiveDependencies());
     }
 
-    private ClazzpathUnit addDependencyToClasspath(Clazzpath cp, Artifact dependency) throws IOException {
+    private ClazzpathUnit addDependencyToClasspath(Clazzpath cp, String dependency, Path file) throws IOException {
         ClazzpathUnit clazzpathUnit = null;
-        try (InputStream is = new FileInputStream(dependency.getFile())) {
+        try (InputStream is = Files.newInputStream(file)) {
             clazzpathUnit = cp.addClazzpathUnit(is, dependency.toString());
         } catch (ZipException e) {
-            log.warn(dependency.getFile()
-                    + " could not be unpacked/read for minimization; dependency is probably malformed.");
+            log.warn(file + " could not be unpacked/read for minimization; dependency is probably malformed.");
             IOException ioe = new IOException(
-                    "Dependency " + dependency + " in file " + dependency.getFile()
+                    "Dependency " + dependency + " in file " + file
                             + " could not be unpacked. File is probably corrupt",
                     e);
             throw ioe;
@@ -293,16 +333,17 @@ public class MinijarFilter implements Filter {
         }
     }
 
-    private void removeSpecificallyIncludedClasses(MavenProject project, List<SimpleFilter> simpleFilters)
+    private void removeSpecificallyIncludedClasses(Map<String, Path> dependencies, List<SimpleFilter> simpleFilters)
             throws IOException {
         // remove classes specifically included in filters
         Clazzpath checkCp = new Clazzpath();
-        for (Artifact dependency : project.getArtifacts()) {
-            File jar = dependency.getFile();
+        for (Map.Entry<String, Path> dependency : dependencies.entrySet()) {
+            File jar = dependency.getValue().toFile();
 
             for (SimpleFilter simpleFilter : simpleFilters) {
                 if (simpleFilter.canFilter(jar)) {
-                    ClazzpathUnit depClazzpathUnit = addDependencyToClasspath(checkCp, dependency);
+                    ClazzpathUnit depClazzpathUnit =
+                            addDependencyToClasspath(checkCp, dependency.getKey(), dependency.getValue());
                     if (depClazzpathUnit != null) {
                         Set<Clazz> clazzes = depClazzpathUnit.getClazzes();
                         for (final Clazz clazz : new HashSet<>(removable)) {

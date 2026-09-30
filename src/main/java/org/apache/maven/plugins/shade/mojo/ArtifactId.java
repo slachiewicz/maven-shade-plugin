@@ -18,8 +18,6 @@
  */
 package org.apache.maven.plugins.shade.mojo;
 
-import org.apache.maven.artifact.Artifact;
-import org.apache.maven.model.Dependency;
 import org.codehaus.plexus.util.SelectorUtils;
 
 /**
@@ -34,14 +32,6 @@ class ArtifactId {
     private final String type;
 
     private final String classifier;
-
-    ArtifactId(Dependency dependency) {
-        this(dependency.getGroupId(), dependency.getArtifactId(), dependency.getType(), dependency.getClassifier());
-    }
-
-    ArtifactId(Artifact artifact) {
-        this(artifact.getGroupId(), artifact.getArtifactId(), artifact.getType(), artifact.getClassifier());
-    }
 
     ArtifactId(String groupId, String artifactId, String type, String classifier) {
         this.groupId = (groupId != null) ? groupId : "";

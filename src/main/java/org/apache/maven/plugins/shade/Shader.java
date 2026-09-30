@@ -20,7 +20,7 @@ package org.apache.maven.plugins.shade;
 
 import java.io.IOException;
 
-import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.api.plugin.MojoException;
 
 /**
  * Interface that defines the process of shading.
@@ -31,7 +31,7 @@ public interface Shader {
      *
      * @param shadeRequest            holds the many parameters to this method
      * @throws IOException            for IO errors reading the thing
-     * @throws MojoExecutionException for anything else that goes wrong
+     * @throws MojoException for anything else that goes wrong
      */
-    void shade(ShadeRequest shadeRequest) throws IOException, MojoExecutionException;
+    void shade(ShadeRequest shadeRequest) throws IOException, MojoException;
 }

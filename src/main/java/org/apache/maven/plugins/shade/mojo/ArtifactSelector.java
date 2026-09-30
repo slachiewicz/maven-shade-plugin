@@ -28,8 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.maven.artifact.Artifact;
-
 /**
  * @author Benjamin Bentmann
  */
@@ -46,14 +44,14 @@ class ArtifactSelector {
 
     private final Set<ArtifactId> matchedPatterns = Collections.newSetFromMap(new IdentityHashMap<>());
 
-    ArtifactSelector(Artifact projectArtifact, ArtifactSet artifactSet, String groupPrefix) {
+    ArtifactSelector(ResolvedArtifact projectArtifact, ArtifactSet artifactSet, String groupPrefix) {
         this(
                 (artifactSet != null) ? artifactSet.getIncludes() : null,
                 (artifactSet != null) ? artifactSet.getExcludes() : null,
                 groupPrefix);
 
         if (projectArtifact != null && !this.includes.isEmpty()) {
-            this.includes.add(new ArtifactId(projectArtifact));
+            this.includes.add(projectArtifact.toId());
         }
     }
 
@@ -80,8 +78,8 @@ class ArtifactSelector {
         return result;
     }
 
-    public boolean isSelected(Artifact artifact) {
-        return artifact != null && isSelected(new ArtifactId(artifact));
+    public boolean isSelected(ResolvedArtifact artifact) {
+        return artifact != null && isSelected(artifact.toId());
     }
 
     boolean isSelected(ArtifactId id) {

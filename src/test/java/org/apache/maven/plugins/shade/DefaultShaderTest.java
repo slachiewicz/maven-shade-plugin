@@ -52,7 +52,7 @@ import java.util.stream.Collectors;
 import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 
-import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.api.plugin.MojoException;
 import org.apache.maven.plugins.shade.filter.Filter;
 import org.apache.maven.plugins.shade.relocation.Relocator;
 import org.apache.maven.plugins.shade.relocation.SimpleRelocator;
@@ -108,7 +108,7 @@ public class DefaultShaderTest {
     private static final String NEWLINE = "\n";
 
     @Test
-    public void testNoopWhenNotRelocated() throws IOException, MojoExecutionException {
+    public void testNoopWhenNotRelocated() throws IOException, MojoException {
         File plexusJar = new File("src/test/jars/plexus-utils-1.4.1.jar");
         File shadedOutput = new File("target/foo-custom_testNoopWhenNotRelocated.jar");
 
@@ -162,7 +162,7 @@ public class DefaultShaderTest {
     }
 
     @Test
-    public void testOverlappingResourcesAreLogged() throws IOException, MojoExecutionException {
+    public void testOverlappingResourcesAreLogged() throws IOException, MojoException {
         DefaultShader shader = newShader();
 
         // we will shade two jars and expect to see META-INF/MANIFEST.MF overlaps, this will always be true
@@ -632,8 +632,7 @@ public class DefaultShaderTest {
             assertEquals("true", shadedJar.getManifest().getMainAttributes().getValue("Multi-Release"));
         }
         assertTrue(
-                warnMessages.getAllValues().stream().anyMatch(m -> m.contains("Multi-Release: false is overridden")),
-                warnMessages.getAllValues().toString());
+                warnMessages.getAllValues().stream().anyMatch(m -> m.contains("Multi-Release: false is overridden")));
 
         temporaryFolder.delete();
     }
@@ -769,8 +768,8 @@ public class DefaultShaderTest {
         ShadeRequest request =
                 moduleMergeRequest(primary, dependency, Collections.emptySet(), newFile(temporaryFolder, "shaded.jar"));
 
-        MojoExecutionException exception =
-                assertThrows(MojoExecutionException.class, () -> newShader().shade(request));
+        MojoException exception =
+                assertThrows(MojoException.class, () -> newShader().shade(request));
         assertTrue(exception.getMessage().contains("dep.DynamicConsumer"), exception.getMessage());
         assertTrue(exception.getMessage().contains("ServiceLoader.load"), exception.getMessage());
         assertTrue(exception.getMessage().contains("service type cannot be determined"), exception.getMessage());
@@ -796,8 +795,8 @@ public class DefaultShaderTest {
         ShadeRequest request =
                 moduleMergeRequest(primary, dependency, Collections.emptySet(), newFile(temporaryFolder, "shaded.jar"));
 
-        MojoExecutionException exception =
-                assertThrows(MojoExecutionException.class, () -> newShader().shade(request));
+        MojoException exception =
+                assertThrows(MojoException.class, () -> newShader().shade(request));
         assertTrue(exception.getMessage().contains("dep.MethodHandleConsumer"), exception.getMessage());
         assertTrue(exception.getMessage().contains("ServiceLoader method handle"), exception.getMessage());
 
@@ -844,8 +843,8 @@ public class DefaultShaderTest {
         ShadeRequest request =
                 moduleMergeRequest(primary, dependency, Collections.emptySet(), newFile(temporaryFolder, "shaded.jar"));
 
-        MojoExecutionException exception =
-                assertThrows(MojoExecutionException.class, () -> newShader().shade(request));
+        MojoException exception =
+                assertThrows(MojoException.class, () -> newShader().shade(request));
 
         assertTrue(
                 exception.getMessage().contains("requires Java " + futureRelease + " platform data"),
@@ -870,8 +869,8 @@ public class DefaultShaderTest {
         ShadeRequest request =
                 moduleMergeRequest(primary, dependency, Collections.emptySet(), newFile(temporaryFolder, "shaded.jar"));
 
-        MojoExecutionException exception =
-                assertThrows(MojoExecutionException.class, () -> newShader().shade(request));
+        MojoException exception =
+                assertThrows(MojoException.class, () -> newShader().shade(request));
         assertTrue(exception.getMessage().contains("dep.AutomaticDependency"), exception.getMessage());
         assertTrue(exception.getMessage().contains("missing.Type"), exception.getMessage());
         assertTrue(exception.getMessage().contains("not present in the shaded output"), exception.getMessage());
@@ -901,8 +900,8 @@ public class DefaultShaderTest {
                 new LinkedHashSet<>(Arrays.asList(externalOne, externalTwo)),
                 newFile(temporaryFolder, "shaded.jar"));
 
-        MojoExecutionException exception =
-                assertThrows(MojoExecutionException.class, () -> newShader().shade(request));
+        MojoException exception =
+                assertThrows(MojoException.class, () -> newShader().shade(request));
         assertTrue(exception.getMessage().contains("external.Type"), exception.getMessage());
         assertTrue(exception.getMessage().contains("external.one"), exception.getMessage());
         assertTrue(exception.getMessage().contains("external.two"), exception.getMessage());
@@ -924,8 +923,8 @@ public class DefaultShaderTest {
         ShadeRequest request =
                 moduleMergeRequest(primary, dependency, Collections.emptySet(), newFile(temporaryFolder, "shaded.jar"));
 
-        MojoExecutionException exception =
-                assertThrows(MojoExecutionException.class, () -> newShader().shade(request));
+        MojoException exception =
+                assertThrows(MojoException.class, () -> newShader().shade(request));
         assertTrue(exception.getMessage().contains("Invalid module-info analysis JDK"), exception.getMessage());
         assertTrue(exception.getMessage().contains("missing jmods/java.base.jmod"), exception.getMessage());
         assertTrue(exception.getMessage().contains("analysisJdkToolchain"), exception.getMessage());
@@ -1145,15 +1144,11 @@ public class DefaultShaderTest {
                 new LinkedHashSet<>(
                         Arrays.asList("hidden/dep/internal/StableProvider", "hidden/dep/versioned/LaterProvider")),
                 providers);
-        assertTrue(
-                warnMessages.getAllValues().stream()
-                        .anyMatch(m -> m.contains(
-                                "Raising the module descriptor floor for app.module from Java 9 to Java 17")),
-                warnMessages.getAllValues().toString());
-        assertTrue(
-                warnMessages.getAllValues().stream()
-                        .anyMatch(m -> m.contains("provider hidden.dep.versioned.LaterProvider for spi.Service")),
-                warnMessages.getAllValues().toString());
+        assertTrue(warnMessages.getAllValues().stream()
+                .anyMatch(
+                        m -> m.contains("Raising the module descriptor floor for app.module from Java 9 to Java 17")));
+        assertTrue(warnMessages.getAllValues().stream()
+                .anyMatch(m -> m.contains("provider hidden.dep.versioned.LaterProvider for spi.Service")));
         assertFalse(warnMessages.getAllValues().stream()
                 .anyMatch(message -> message.contains("transitive platform requirement jdk.incubator.vector")));
 
@@ -1219,8 +1214,8 @@ public class DefaultShaderTest {
         request.setResourceTransformers(Collections.emptyList());
         request.setUberJar(newFile(temporaryFolder, "shaded.jar"));
 
-        MojoExecutionException exception =
-                assertThrows(MojoExecutionException.class, () -> newShader().shade(request));
+        MojoException exception =
+                assertThrows(MojoException.class, () -> newShader().shade(request));
         assertTrue(exception.getMessage().contains("dep.versioned.Provider11"), exception.getMessage());
         assertTrue(
                 exception.getMessage().contains("cannot be exposed while app.module is automatic"),
@@ -1330,8 +1325,8 @@ public class DefaultShaderTest {
         request.setResourceTransformers(Collections.emptyList());
         request.setUberJar(newFile(temporaryFolder, "shaded.jar"));
 
-        MojoExecutionException exception =
-                assertThrows(MojoExecutionException.class, () -> newShader().shade(request));
+        MojoException exception =
+                assertThrows(MojoException.class, () -> newShader().shade(request));
         assertTrue(
                 exception.getMessage().contains("exported package app.api from the primary descriptor is absent"),
                 exception.getMessage());
@@ -1401,9 +1396,7 @@ public class DefaultShaderTest {
         assertEquals("linux-amd64", target[0].targetPlatform);
         assertEquals(1, resolution[0].resolutionFlags);
         assertFalse(otherAttributes.contains("ModuleHashes"));
-        assertTrue(
-                warnMessages.getAllValues().stream().anyMatch(m -> m.contains("Dropping ModuleHashes")),
-                warnMessages.getAllValues().toString());
+        assertTrue(warnMessages.getAllValues().stream().anyMatch(m -> m.contains("Dropping ModuleHashes")));
 
         temporaryFolder.delete();
     }

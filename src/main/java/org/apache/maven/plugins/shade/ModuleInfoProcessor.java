@@ -51,7 +51,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipException;
 
-import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.api.plugin.MojoException;
 import org.apache.maven.plugins.shade.filter.Filter;
 import org.apache.maven.plugins.shade.relocation.Relocator;
 import org.apache.maven.plugins.shade.resource.ServicesResourceTransformer;
@@ -122,7 +122,7 @@ final class ModuleInfoProcessor {
 
     private PlatformModuleIndex platformModules;
 
-    ModuleInfoProcessor(ShadeRequest request, Logger logger) throws IOException, MojoExecutionException {
+    ModuleInfoProcessor(ShadeRequest request, Logger logger) throws IOException, MojoException {
         this.logger = logger;
         this.primaryArtifact = request.getPrimaryArtifact();
         this.relocators = request.getRelocators();
@@ -244,7 +244,7 @@ final class ModuleInfoProcessor {
     }
 
     void writeDescriptors(JarOutputStream output, ServicesResourceTransformer servicesTransformer)
-            throws IOException, MojoExecutionException {
+            throws IOException, MojoException {
         if (primaryArtifact == null || !artifacts.containsKey(primaryArtifact)) {
             logger.warn("Module descriptor merging was requested, but the shaded output has no primary artifact.");
             return;
@@ -290,7 +290,7 @@ final class ModuleInfoProcessor {
         validateConfiguredRequirements(candidates);
         SortedSet<String> allPackages = collectAllPackages(candidates);
         if (allPackages.contains("")) {
-            throw new MojoExecutionException("Cannot create module " + outputModuleName
+            throw new MojoException("Cannot create module " + outputModuleName
                     + ": the shaded JAR contains a class in the unnamed package.");
         }
         for (MergedDescriptor descriptor : candidates) {
@@ -327,11 +327,11 @@ final class ModuleInfoProcessor {
         multiReleaseOutput = true;
     }
 
-    private ArtifactData scanArtifact(File artifact) throws IOException, MojoExecutionException {
+    private ArtifactData scanArtifact(File artifact) throws IOException, MojoException {
         return scanArtifact(artifact, true);
     }
 
-    private ArtifactData scanArtifact(File artifact, boolean scanServices) throws IOException, MojoExecutionException {
+    private ArtifactData scanArtifact(File artifact, boolean scanServices) throws IOException, MojoException {
         ArtifactData result = new ArtifactData(artifact);
         if (artifact.isDirectory()) {
             File manifestFile = new File(artifact, JarFile.MANIFEST_NAME);
@@ -371,7 +371,7 @@ final class ModuleInfoProcessor {
     }
 
     private void scanDirectory(ArtifactData data, File root, File current, String prefix, boolean scanServices)
-            throws IOException, MojoExecutionException {
+            throws IOException, MojoException {
         File[] children = current.listFiles();
         if (children == null) {
             return;
@@ -396,7 +396,7 @@ final class ModuleInfoProcessor {
     }
 
     private ServiceConfiguration parseServiceConfiguration(InputStream input, File artifact, String entry)
-            throws IOException, MojoExecutionException {
+            throws IOException, MojoException {
         Matcher matcher = SERVICE_CONFIGURATION.matcher(entry);
         if (!matcher.matches()) {
             throw new IllegalArgumentException(entry);
@@ -418,10 +418,9 @@ final class ModuleInfoProcessor {
         return new ServiceConfiguration(entry, service, providers);
     }
 
-    private void validateServiceClassName(String name, File artifact, String entry) throws MojoExecutionException {
+    private void validateServiceClassName(String name, File artifact, String entry) throws MojoException {
         if (!isBinaryClassName(name)) {
-            throw new MojoExecutionException(
-                    "Invalid service class name " + name + " in " + artifact + '!' + entry + '.');
+            throw new MojoException("Invalid service class name " + name + " in " + artifact + '!' + entry + '.');
         }
     }
 
@@ -447,7 +446,7 @@ final class ModuleInfoProcessor {
     }
 
     private ModuleDescriptorData parseDescriptor(InputStream input, File artifact, String entry)
-            throws IOException, MojoExecutionException {
+            throws IOException, MojoException {
         try {
             final ModuleDescriptorData descriptor = new ModuleDescriptorData();
             ClassReader reader = new ClassReader(input);
@@ -525,16 +524,16 @@ final class ModuleInfoProcessor {
                     new Attribute[] {new ModuleTargetAttribute(), new ModuleResolutionAttribute()},
                     0);
             if (descriptor.name == null) {
-                throw new MojoExecutionException(
+                throw new MojoException(
                         "Invalid module descriptor " + entry + " in " + artifact + ": missing Module attribute.");
             }
             return descriptor;
         } catch (IllegalArgumentException e) {
-            throw new MojoExecutionException("Cannot parse module descriptor " + entry + " in " + artifact, e);
+            throw new MojoException("Cannot parse module descriptor " + entry + " in " + artifact, e);
         }
     }
 
-    private MergedDescriptor mergeRelease(int release, DescriptorEntry primaryEntry) throws MojoExecutionException {
+    private MergedDescriptor mergeRelease(int release, DescriptorEntry primaryEntry) throws MojoException {
         ModuleDescriptorData primary = primaryEntry.descriptor;
         MergedDescriptor result = new MergedDescriptor(release, primaryEntry);
         result.name = outputModuleName;
@@ -692,7 +691,7 @@ final class ModuleInfoProcessor {
     }
 
     private void addConfiguredDirectives(MergedDescriptor target, Set<String> embeddedNames, int release)
-            throws MojoExecutionException {
+            throws MojoException {
         for (ModuleInfoConfiguration.PackageDirective configured : configuration.getAdditionalExports()) {
             Export export = configuredExport(configured, embeddedNames, "export");
             if (export != null) {
@@ -708,12 +707,11 @@ final class ModuleInfoProcessor {
         for (ModuleInfoConfiguration.Requirement configured : configuration.getAdditionalRequires()) {
             String module = configured.getModule();
             if (module == null || module.trim().isEmpty()) {
-                throw new MojoExecutionException(
-                        "moduleInfo.additionalRequires contains a requirement with no module.");
+                throw new MojoException("moduleInfo.additionalRequires contains a requirement with no module.");
             }
             if (embeddedNames.contains(module)) {
-                throw new MojoExecutionException("moduleInfo.additionalRequires cannot require embedded module "
-                        + module + " in the amalgamated output.");
+                throw new MojoException("moduleInfo.additionalRequires cannot require embedded module " + module
+                        + " in the amalgamated output.");
             }
             if (isPlatformModule(module) && !platformModules().hasModule(module, release)) {
                 continue;
@@ -736,7 +734,7 @@ final class ModuleInfoProcessor {
     }
 
     private void addConfiguredUse(MergedDescriptor target, String configured, String parameter, int release)
-            throws MojoExecutionException {
+            throws MojoException {
         String service = relocateConfiguredClass(configured, parameter);
         if (hasClass(service, release)) {
             target.uses.add(service);
@@ -744,7 +742,7 @@ final class ModuleInfoProcessor {
         }
         SortedSet<String> owners = findModuleOwners(toInternalName(service), release);
         if (owners.size() > 1) {
-            throw new MojoExecutionException(
+            throw new MojoException(
                     "Configured service type " + service + " is owned by multiple modules " + owners + '.');
         }
         if (!owners.isEmpty()) {
@@ -758,7 +756,7 @@ final class ModuleInfoProcessor {
 
     private Export configuredExport(
             ModuleInfoConfiguration.PackageDirective configured, Set<String> embeddedNames, String directive)
-            throws MojoExecutionException {
+            throws MojoException {
         String packaze = configuredPackage(configured, directive);
         SortedSet<String> targets = configuredTargets(configured, embeddedNames);
         return configured.getTargets().isEmpty() || !targets.isEmpty()
@@ -767,7 +765,7 @@ final class ModuleInfoProcessor {
     }
 
     private Open configuredOpen(ModuleInfoConfiguration.PackageDirective configured, Set<String> embeddedNames)
-            throws MojoExecutionException {
+            throws MojoException {
         String packaze = configuredPackage(configured, "open");
         SortedSet<String> targets = configuredTargets(configured, embeddedNames);
         return configured.getTargets().isEmpty() || !targets.isEmpty()
@@ -776,10 +774,10 @@ final class ModuleInfoProcessor {
     }
 
     private String configuredPackage(ModuleInfoConfiguration.PackageDirective configured, String directive)
-            throws MojoExecutionException {
+            throws MojoException {
         if (configured.getPackageName() == null
                 || configured.getPackageName().trim().isEmpty()) {
-            throw new MojoExecutionException("moduleInfo.additional" + directive + "s contains an empty package.");
+            throw new MojoException("moduleInfo.additional" + directive + "s contains an empty package.");
         }
         return relocatePackage(configured.getPackageName());
     }
@@ -791,9 +789,9 @@ final class ModuleInfoProcessor {
         return targets;
     }
 
-    private String relocateConfiguredClass(String className, String parameter) throws MojoExecutionException {
+    private String relocateConfiguredClass(String className, String parameter) throws MojoException {
         if (className == null || className.trim().isEmpty()) {
-            throw new MojoExecutionException(parameter + " contains an empty service class.");
+            throw new MojoException(parameter + " contains an empty service class.");
         }
         return relocateClass(className);
     }
@@ -815,7 +813,7 @@ final class ModuleInfoProcessor {
                 || !configuration.getDynamicUses().isEmpty();
     }
 
-    private void validateConfiguredRequirements(List<MergedDescriptor> candidates) throws MojoExecutionException {
+    private void validateConfiguredRequirements(List<MergedDescriptor> candidates) throws MojoException {
         for (ModuleInfoConfiguration.Requirement requirement : configuration.getAdditionalRequires()) {
             String module = requirement.getModule();
             boolean found = false;
@@ -826,7 +824,7 @@ final class ModuleInfoProcessor {
                 }
             }
             if (!found) {
-                throw new MojoExecutionException("Configured moduleInfo requirement " + module
+                throw new MojoException("Configured moduleInfo requirement " + module
                         + " is not available through Java " + candidates.get(candidates.size() - 1).release
                         + " in the selected analysis JDK or resolved dependency hull.");
             }
@@ -836,7 +834,7 @@ final class ModuleInfoProcessor {
     }
 
     private void validateConfiguredUses(List<MergedDescriptor> candidates, Set<String> configured, String parameter)
-            throws MojoExecutionException {
+            throws MojoException {
         for (String service : configured) {
             String relocated = relocateConfiguredClass(service, parameter);
             boolean found = false;
@@ -847,7 +845,7 @@ final class ModuleInfoProcessor {
                 }
             }
             if (!found) {
-                throw new MojoExecutionException("Configured service type " + relocated
+                throw new MojoException("Configured service type " + relocated
                         + " is not available through Java " + candidates.get(candidates.size() - 1).release
                         + " in the shaded output, selected analysis JDK, or resolved dependency hull.");
             }
@@ -912,7 +910,7 @@ final class ModuleInfoProcessor {
         }
     }
 
-    private void addAutomaticRequirements(MergedDescriptor target, int release) throws MojoExecutionException {
+    private void addAutomaticRequirements(MergedDescriptor target, int release) throws MojoException {
         for (RetainedClass retainedClass : effectiveRetainedClasses(release).values()) {
             if (retainedClass.origin.effectiveDescriptor(release) != null) {
                 continue;
@@ -930,7 +928,7 @@ final class ModuleInfoProcessor {
 
             if (!retainedClass.unresolvedServiceUses.isEmpty()) {
                 if (configuration.getDynamicUses().isEmpty()) {
-                    throw new MojoExecutionException("Cannot preserve ServiceLoader semantics for automatic module "
+                    throw new MojoException("Cannot preserve ServiceLoader semantics for automatic module "
                             + retainedClass.origin.effectiveOutputModuleName(release) + " in "
                             + retainedClass.origin.file
                             + ": retained class " + toClassName(retainedClass.className) + " invokes "
@@ -953,7 +951,7 @@ final class ModuleInfoProcessor {
                 }
                 SortedSet<String> owners = findModuleOwners(reference, release);
                 if (owners.isEmpty()) {
-                    throw new MojoExecutionException("Cannot infer module requirements for automatic module "
+                    throw new MojoException("Cannot infer module requirements for automatic module "
                             + retainedClass.origin.effectiveOutputModuleName(release) + " in "
                             + retainedClass.origin.file
                             + ": retained class " + toClassName(retainedClass.className) + " references "
@@ -963,7 +961,7 @@ final class ModuleInfoProcessor {
                             + '.');
                 }
                 if (owners.size() > 1) {
-                    throw new MojoExecutionException("Cannot infer module requirements for automatic module "
+                    throw new MojoException("Cannot infer module requirements for automatic module "
                             + retainedClass.origin.effectiveOutputModuleName(release) + " in "
                             + retainedClass.origin.file
                             + ": retained class " + toClassName(retainedClass.className) + " references "
@@ -994,7 +992,7 @@ final class ModuleInfoProcessor {
         return result;
     }
 
-    private SortedSet<String> findModuleOwners(String className, int release) throws MojoExecutionException {
+    private SortedSet<String> findModuleOwners(String className, int release) throws MojoException {
         SortedSet<String> owners = platformModules().findOwners(className, release);
         for (ArtifactData artifact : dependencyArtifacts.values()) {
             if (artifact.hasClass(className, release)) {
@@ -1007,7 +1005,7 @@ final class ModuleInfoProcessor {
         return owners;
     }
 
-    private PlatformModuleIndex platformModules() throws MojoExecutionException {
+    private PlatformModuleIndex platformModules() throws MojoException {
         if (platformModules == null) {
             platformModules = new PlatformModuleIndex(effectiveAnalysisJdkHome());
         }
@@ -1018,8 +1016,8 @@ final class ModuleInfoProcessor {
         return analysisJdkHome == null ? new File(System.getProperty("java.home")) : analysisJdkHome;
     }
 
-    private MojoExecutionException analysisJdkTooOld(int requiredRelease, int actualRelease) {
-        return new MojoExecutionException("Module-info analysis requires Java " + requiredRelease
+    private MojoException analysisJdkTooOld(int requiredRelease, int actualRelease) {
+        return new MojoException("Module-info analysis requires Java " + requiredRelease
                 + " platform data, but the selected JDK at " + effectiveAnalysisJdkHome() + " provides Java "
                 + actualRelease + ". Configure moduleInfo.analysisJdkToolchain with Java " + requiredRelease
                 + " or newer.");
@@ -1051,36 +1049,36 @@ final class ModuleInfoProcessor {
     }
 
     private void validateProjectDirectives(MergedDescriptor result, ModuleDescriptorData primary, int release)
-            throws MojoExecutionException {
+            throws MojoException {
         Set<String> packages = effectivePackages(release);
         for (String packaze : result.primaryExports.keySet()) {
             if (!packages.contains(packaze)) {
-                throw new MojoExecutionException("Cannot create module " + result.name + ": exported package " + packaze
+                throw new MojoException("Cannot create module " + result.name + ": exported package " + packaze
                         + " from the primary descriptor is absent from the shaded output at Java " + release + '.');
             }
         }
         for (String packaze : result.primaryOpens.keySet()) {
             if (!packages.contains(packaze)) {
-                throw new MojoExecutionException("Cannot create module " + result.name + ": opened package " + packaze
+                throw new MojoException("Cannot create module " + result.name + ": opened package " + packaze
                         + " from the primary descriptor is absent from the shaded output at Java " + release + '.');
             }
         }
         if (result.mainClass != null && !hasClass(result.mainClass, release)) {
-            throw new MojoExecutionException("Cannot create module " + result.name + ": main class " + result.mainClass
+            throw new MojoException("Cannot create module " + result.name + ": main class " + result.mainClass
                     + " from the primary descriptor is absent from the shaded output at Java " + release + '.');
         }
         for (Map.Entry<String, SortedSet<String>> provides : primary.provides.entrySet()) {
             for (String provider : provides.getValue()) {
                 String relocated = relocateClass(provider);
                 if (!hasClass(relocated, release)) {
-                    throw new MojoExecutionException("Cannot create module " + result.name + ": provider " + relocated
+                    throw new MojoException("Cannot create module " + result.name + ": provider " + relocated
                             + " from the primary descriptor is absent from the shaded output at Java " + release + '.');
                 }
             }
         }
     }
 
-    private void validatePrimaryBoundary(List<MergedDescriptor> candidates) throws MojoExecutionException {
+    private void validatePrimaryBoundary(List<MergedDescriptor> candidates) throws MojoException {
         MergedDescriptor first = candidates.get(0);
         for (MergedDescriptor candidate : candidates) {
             if (!Objects.equals(first.name, candidate.name)
@@ -1091,7 +1089,7 @@ final class ModuleInfoProcessor {
                     || !Objects.equals(first.resolutionFlags, candidate.resolutionFlags)
                     || !Objects.equals(first.primaryExports, candidate.primaryExports)
                     || !Objects.equals(first.primaryOpens, candidate.primaryOpens)) {
-                throw new MojoExecutionException(
+                throw new MojoException(
                         "Primary module descriptors for " + primaryArtifact
                                 + " change module identity, exports, opens, main class, target, or resolution across releases.");
             }
@@ -1116,7 +1114,7 @@ final class ModuleInfoProcessor {
     }
 
     private void normalizeProvidersAndFloor(List<MergedDescriptor> candidates, int earliestRelease)
-            throws MojoExecutionException {
+            throws MojoException {
         Map<String, SortedSet<String>> invariantProvides = new TreeMap<>();
         Map<String, Export> invariantExports = new TreeMap<>();
         Map<String, Open> invariantOpens = new TreeMap<>();
@@ -1137,8 +1135,8 @@ final class ModuleInfoProcessor {
             for (String provider : provides.getValue()) {
                 int available = firstAvailableRelease(provider, candidates);
                 if (available < 0) {
-                    throw new MojoExecutionException("Cannot create module " + outputModuleName + ": provider class "
-                            + provider + " is absent.");
+                    throw new MojoException("Cannot create module " + outputModuleName + ": provider class " + provider
+                            + " is absent.");
                 }
                 if (available > earliestRelease) {
                     ServiceProvider key = new ServiceProvider(provides.getKey(), provider);
@@ -1152,7 +1150,7 @@ final class ModuleInfoProcessor {
         for (String packaze : invariantExports.keySet()) {
             int available = firstAvailablePackageRelease(packaze, candidates);
             if (available < 0) {
-                throw new MojoExecutionException(
+                throw new MojoException(
                         "Cannot export package " + packaze + " from " + outputModuleName + ": the package is absent.");
             }
             if (available > earliestRelease) {
@@ -1163,7 +1161,7 @@ final class ModuleInfoProcessor {
         for (String packaze : invariantOpens.keySet()) {
             int available = firstAvailablePackageRelease(packaze, candidates);
             if (available < 0) {
-                throw new MojoExecutionException(
+                throw new MojoException(
                         "Cannot open package " + packaze + " from " + outputModuleName + ": the package is absent.");
             }
             if (available > earliestRelease) {
@@ -1192,7 +1190,7 @@ final class ModuleInfoProcessor {
 
         for (Map.Entry<ServiceProvider, Integer> provider : providerAvailability.entrySet()) {
             if (provider.getValue() < floor && !hasRootClass(provider.getKey().provider)) {
-                throw new MojoExecutionException("Provider " + provider.getKey().provider + " for "
+                throw new MojoException("Provider " + provider.getKey().provider + " for "
                         + provider.getKey().service + " first available in Java " + provider.getValue()
                         + " cannot be exposed while " + outputModuleName + " is automatic below its Java " + floor
                         + " modular floor: META-INF/services cannot be versioned.");
@@ -1425,7 +1423,7 @@ final class ModuleInfoProcessor {
         return dotted;
     }
 
-    private void determinePrimaryModuleName() throws MojoExecutionException {
+    private void determinePrimaryModuleName() throws MojoException {
         if (primaryArtifact == null) {
             return;
         }
@@ -1443,19 +1441,19 @@ final class ModuleInfoProcessor {
             return;
         }
         if (names.size() != 1) {
-            throw new MojoExecutionException(
+            throw new MojoException(
                     "Primary artifact " + primaryArtifact + " has conflicting module names " + names + '.');
         }
         primaryModuleName = names.iterator().next();
         if (primary.automaticModuleNameExplicit
                 && primary.automaticModuleName != null
                 && !primaryModuleName.equals(primary.automaticModuleName)) {
-            throw new MojoExecutionException("Primary artifact " + primaryArtifact + " declares Automatic-Module-Name "
+            throw new MojoException("Primary artifact " + primaryArtifact + " declares Automatic-Module-Name "
                     + primary.automaticModuleName + " but its descriptor declares " + primaryModuleName + '.');
         }
     }
 
-    private void determineOutputModuleName() throws MojoExecutionException {
+    private void determineOutputModuleName() throws MojoException {
         if (primaryModuleName == null) {
             return;
         }
@@ -1463,7 +1461,7 @@ final class ModuleInfoProcessor {
         if (configuredModuleName == null) {
             outputModuleName = primaryModuleName;
         } else if (!ModuleInfoConfiguration.isValidModuleName(configuredModuleName)) {
-            throw new MojoExecutionException(
+            throw new MojoException(
                     "Invalid moduleInfo.moduleName '" + configuredModuleName + "': expected a qualified Java name.");
         } else {
             outputModuleName = configuredModuleName;
