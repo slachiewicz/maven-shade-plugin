@@ -18,9 +18,6 @@
  */
 package org.apache.maven.plugins.shade;
 
-import javax.inject.Named;
-import javax.inject.Singleton;
-
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -58,7 +55,10 @@ import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 
-import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.api.di.Inject;
+import org.apache.maven.api.di.Named;
+import org.apache.maven.api.di.Singleton;
+import org.apache.maven.api.plugin.MojoException;
 import org.apache.maven.plugins.shade.filter.Filter;
 import org.apache.maven.plugins.shade.relocation.Relocator;
 import org.apache.maven.plugins.shade.resource.ManifestResourceTransformer;
@@ -78,12 +78,13 @@ import org.slf4j.LoggerFactory;
  * @author Jason van Zyl
  */
 @Singleton
-@Named
+@Named("default")
 public class DefaultShader implements Shader {
     private static final int BUFFER_SIZE = 32 * 1024;
 
     private final Logger logger;
 
+    @Inject
     public DefaultShader() {
         this(LoggerFactory.getLogger(DefaultShader.class));
     }
@@ -131,7 +132,7 @@ public class DefaultShader implements Shader {
         return false;
     }
 
-    public void shade(ShadeRequest shadeRequest) throws IOException, MojoExecutionException {
+    public void shade(ShadeRequest shadeRequest) throws IOException, MojoException {
         Set<String> resources = new HashSet<>();
 
         ManifestResourceTransformer manifestTransformer = null;
@@ -591,7 +592,7 @@ public class DefaultShader implements Shader {
 
     private void addRemappedClass(
             JarOutputStream jos, File jar, String name, long time, InputStream is, DefaultPackageMapper packageMapper)
-            throws IOException, MojoExecutionException {
+            throws IOException, MojoException {
         if (packageMapper.relocators.isEmpty()) {
             try {
                 JarEntry entry = new JarEntry(name);
@@ -625,7 +626,7 @@ public class DefaultShader implements Shader {
         try {
             cr.accept(cv, ClassReader.EXPAND_FRAMES);
         } catch (Throwable ise) {
-            throw new MojoExecutionException("Error in ASM processing class " + name, ise);
+            throw new MojoException("Error in ASM processing class " + name, ise);
         }
 
         // If nothing was relocated by ShadeClassRemapper, write the original class, otherwise the transformed one

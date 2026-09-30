@@ -49,7 +49,7 @@ import java.util.stream.Collectors;
 import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 
-import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.api.plugin.MojoException;
 import org.apache.maven.plugins.shade.filter.Filter;
 import org.apache.maven.plugins.shade.relocation.Relocator;
 import org.apache.maven.plugins.shade.relocation.SimpleRelocator;
@@ -93,7 +93,7 @@ public class DefaultShaderTest {
     private static final String NEWLINE = "\n";
 
     @Test
-    public void testNoopWhenNotRelocated() throws IOException, MojoExecutionException {
+    public void testNoopWhenNotRelocated() throws IOException, MojoException {
         File plexusJar = new File("src/test/jars/plexus-utils-1.4.1.jar");
         File shadedOutput = new File("target/foo-custom_testNoopWhenNotRelocated.jar");
 
@@ -147,7 +147,7 @@ public class DefaultShaderTest {
     }
 
     @Test
-    public void testOverlappingResourcesAreLogged() throws IOException, MojoExecutionException {
+    public void testOverlappingResourcesAreLogged() throws IOException, MojoException {
         DefaultShader shader = newShader();
 
         // we will shade two jars and expect to see META-INF/MANIFEST.MF overlaps, this will always be true

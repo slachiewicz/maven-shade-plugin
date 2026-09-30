@@ -22,7 +22,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.maven.project.MavenProject;
+import org.apache.maven.api.Project;
 
 /**
  * Manually creates the resource processors needed to remove the original pom.xml and inject
@@ -30,7 +30,7 @@ import org.apache.maven.project.MavenProject;
  */
 public class UseDependencyReducedPom {
     public static List<ResourceTransformer> createPomReplaceTransformers(
-            MavenProject project, File dependencyReducedPomLocation) {
+            Project project, File dependencyReducedPomLocation) {
         String pomInFinalJarFilename =
                 "META-INF/maven/" + project.getGroupId() + "/" + project.getArtifactId() + "/pom.xml";
 

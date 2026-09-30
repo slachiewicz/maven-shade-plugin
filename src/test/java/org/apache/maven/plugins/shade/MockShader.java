@@ -18,12 +18,11 @@
  */
 package org.apache.maven.plugins.shade;
 
-import javax.inject.Named;
-import javax.inject.Singleton;
-
 import java.io.IOException;
 
-import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.api.di.Named;
+import org.apache.maven.api.di.Singleton;
+import org.apache.maven.api.plugin.MojoException;
 
 /**
  * @author Olivier Lamy
@@ -31,7 +30,7 @@ import org.apache.maven.plugin.MojoExecutionException;
 @Singleton
 @Named("mock")
 public class MockShader implements Shader {
-    public void shade(ShadeRequest shadeRequest) throws IOException, MojoExecutionException {
+    public void shade(ShadeRequest shadeRequest) throws IOException, MojoException {
         System.out.println("Executing MockShader#shade");
     }
 }
